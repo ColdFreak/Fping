@@ -31,6 +31,7 @@ int generate_list = 0;
 
 void usage(void);
 void add_cidr(char *addr);
+void add_name(char *name);
 
 int main(int argc, char **argv) {
 	int c;
@@ -95,10 +96,19 @@ void add_cidr(char *addr) {
 	char *addr_end;
 	char *mask_str;
 	unsigned long mask;
+
+	int ret;
+	struct addrinfo addr_hints;
+	struct addrinfo *addr_res;
+
+	unsigned long net_addr;
+	unsigned long net_last;
+	unsigned long long bitmask;
 	/* find the '/' symbol in 192.168.1.0/24 */
 	addr_end = strchr(addr, '/');
 	if(addr_end == NULL)
 		usage();
+	/* 192.168.1.0/24 became 192.168.1.0 */
 	*addr_end = '\0';
 	mask_str = addr_end+1;
 	mask = atoi(mask_str);
@@ -106,4 +116,35 @@ void add_cidr(char *addr) {
 		fprintf(stderr, "Error, netmask must be between 1 and 30(is: %s)\n",mask_str);
 		exit (1);
 	}
+	
+	/* clear addr_hints */
+	memset(&addr_hints, 0, sizeof(struct addrinfo));
+	addr_hints.ai_family = AF_UNSPEC;
+	addr_hints.ai_flags = AI_NUMERICHOST;
+	ret = getaddrinfo(addr, NULL, &addr_hints, &addr_res);
+	if(ret) {
+		fprintf(stderr, "Error: can't parse address %s: %s\n",addr, gai_strerror(ret));
+		exit (1);
+	}
+	
+	/* uint32_t ntohl (uint32_t netlong); */
+	net_addr = ntohl(((struct sockaddr_in *)addr_res->ai_addr)->sin_addr.s_addr);
+	bitmask = 0xFFFFFFFF << (32 - mask);
+	net_addr &= bitmask;
+	net_last = net_addr + ((unsigned long)0x1 << (32-mask)) -1;
+	while(++net_addr < net_last) {
+		struct in_addr in_addr_tmp;
+		/* fill in with 192.168.1.24 */
+		char buffer[20];
+		/*uint32_t htonl(uint32_t hostlong);
+		 * struct in_addr {
+		 *		unsigned long s_addr;
+		 * }
+		 */
+		in_addr_tmp.s_addr = htonl(net_addr);
+		inet_ntop(AF_INET, &in_addr_tmp, buffer, sizeof(buffer));
+		addr_name(buffer);
+	}
+	freeaddrinfo(addr_res);
+}
 
