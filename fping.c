@@ -15,14 +15,22 @@
 #include <unistd.h>
 
 #define MIN_INTERVAL	10
-typedef struct HOST {
+typedef struct host_entry {
 
-};
 
+}HOST_ENTRY;
+
+/* global */
+HOST_ENTRY **table = NULL; /*array of pointers to items in the list */
+
+/* global stats*/
+int num_hosts; /* total number of hosts */
+/* -i and -g options */
 unsigned int interval = 25 * 100;
 int generate_list = 0;
 
 void usage(void);
+void add_cidr(char *addr);
 
 int main(int argc, char **argv) {
 	int c;
@@ -62,6 +70,14 @@ int main(int argc, char **argv) {
 			usage();
 	}
 
+	table = (HOST_ENTRY **)malloc(sizeof(HOST_ENTRY *) * num_hosts);
+	if(! table) {
+	   perror("Can't malloc array of pointers in the list");
+	   exit (1);
+	}
+
+
+
 
 
 }
@@ -72,3 +88,22 @@ void usage(void) {
 	fprintf(stderr, "-g\tgenerate target list\n");
 	exit (1);
 }
+
+
+
+void add_cidr(char *addr) {
+	char *addr_end;
+	char *mask_str;
+	unsigned long mask;
+	/* find the '/' symbol in 192.168.1.0/24 */
+	addr_end = strchr(addr, '/');
+	if(addr_end == NULL)
+		usage();
+	*addr_end = '\0';
+	mask_str = addr_end+1;
+	mask = atoi(mask_str);
+	if(mask < 1 || mask > 30 ){
+		fprintf(stderr, "Error, netmask must be between 1 and 30(is: %s)\n",mask_str);
+		exit (1);
+	}
+
